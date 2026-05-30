@@ -1143,7 +1143,8 @@ on_icc_create_bytes_read (GObject      *source_object,
     {
       meta_wayland_image_description_set_ready (image_desc,
                                                 color_state,
-                                                META_WAYLAND_IMAGE_DESCRIPTION_FLAGS_DEFAULT);
+                                                META_WAYLAND_IMAGE_DESCRIPTION_FLAGS_DEFAULT |
+                                                META_WAYLAND_IMAGE_DESCRIPTION_FLAGS_ALLOW_INFO);
     }
   else
     {
@@ -1328,7 +1329,8 @@ creator_params_create (struct wl_client   *client,
                                                    image_desc_resource);
   meta_wayland_image_description_set_ready (image_desc,
                                             color_state,
-                                            META_WAYLAND_IMAGE_DESCRIPTION_FLAGS_DEFAULT);
+                                            META_WAYLAND_IMAGE_DESCRIPTION_FLAGS_DEFAULT |
+                                            META_WAYLAND_IMAGE_DESCRIPTION_FLAGS_ALLOW_INFO);
 
   wl_resource_set_implementation (image_desc_resource,
                                   &meta_wayland_image_description_interface,
@@ -1959,7 +1961,8 @@ color_manager_create_windows_scrgb (struct wl_client   *client,
                                        image_desc_resource);
   meta_wayland_image_description_set_ready (image_desc,
                                             color_state,
-                                            META_WAYLAND_IMAGE_DESCRIPTION_FLAGS_DEFAULT);
+                                            META_WAYLAND_IMAGE_DESCRIPTION_FLAGS_DEFAULT |
+                                            META_WAYLAND_IMAGE_DESCRIPTION_FLAGS_ALLOW_INFO);
 
   wl_resource_set_implementation (image_desc_resource,
                                   &meta_wayland_image_description_interface,
