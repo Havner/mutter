@@ -124,7 +124,7 @@ color_management (void)
   g_assert_cmpuint (colorimetry->colorspace, ==, CLUTTER_COLORSPACE_SRGB);
   eotf = clutter_color_state_params_get_eotf (color_state_params);
   g_assert_cmpuint (eotf->type, ==, CLUTTER_EOTF_TYPE_NAMED);
-  g_assert_cmpuint (eotf->tf_name, ==, CLUTTER_TRANSFER_FUNCTION_GAMMA22);
+  g_assert_cmpuint (eotf->tf_name, ==, CLUTTER_TRANSFER_FUNCTION_SRGB_PIECEWISE);
   lum = clutter_color_state_params_get_luminance (color_state_params);
   g_assert_cmpuint (lum->type, ==, CLUTTER_LUMINANCE_TYPE_EXPLICIT);
   g_assert_cmpfloat (lum->mastering_max, ==, lum->max);
@@ -206,6 +206,27 @@ color_management (void)
   mastering = clutter_color_state_params_get_mastering_metadata (color_state_params);
   g_assert_true (mastering->has_primaries);
   emit_sync_event (6);
+
+  wait_for_sync_point (7);
+  color_state = get_window_color_state (test_window);
+  color_state_params = CLUTTER_COLOR_STATE_PARAMS (color_state);
+  colorimetry = clutter_color_state_params_get_colorimetry (color_state_params);
+  g_assert_cmpuint (colorimetry->type, ==, CLUTTER_COLORIMETRY_TYPE_COLORSPACE);
+  g_assert_cmpuint (colorimetry->colorspace, ==, CLUTTER_COLORSPACE_BT2020);
+  eotf = clutter_color_state_params_get_eotf (color_state_params);
+  g_assert_cmpuint (eotf->type, ==, CLUTTER_EOTF_TYPE_NAMED);
+  g_assert_cmpuint (eotf->tf_name, ==, CLUTTER_TRANSFER_FUNCTION_PQ);
+  lum = clutter_color_state_params_get_luminance (color_state_params);
+  g_assert_cmpuint (lum->type, ==, CLUTTER_LUMINANCE_TYPE_EXPLICIT);
+  g_assert_cmpfloat_with_epsilon (lum->min, 0.005f, TEST_COLOR_EPSILON);
+  g_assert_cmpfloat_with_epsilon (lum->max, lum->min + 10000.0f, TEST_COLOR_EPSILON);
+  g_assert_cmpfloat_with_epsilon (lum->ref, 203.0f, TEST_COLOR_EPSILON);
+  mastering = clutter_color_state_params_get_mastering_metadata (color_state_params);
+  g_assert_true (mastering->has_primaries);
+  g_assert_false (mastering->has_luminance);
+  g_assert_false (mastering->has_max_cll);
+  g_assert_false (mastering->has_max_fall);
+  emit_sync_event (7);
 
   meta_wayland_test_client_finish (wayland_test_client);
 }

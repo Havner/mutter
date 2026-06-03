@@ -1971,6 +1971,74 @@ color_manager_create_windows_scrgb (struct wl_client   *client,
 }
 
 static void
+color_manager_create_windows_bt2100 (struct wl_client   *client,
+                                     struct wl_resource *resource,
+                                     uint32_t            id)
+{
+  MetaWaylandColorManager *color_manager = wl_resource_get_user_data (resource);
+  ClutterContext *clutter_context = get_clutter_context (color_manager);
+  struct wl_resource *image_desc_resource;
+  g_autoptr (ClutterColorState) color_state = NULL;
+  MetaWaylandImageDescription *image_desc;
+  ClutterColorimetry colorimetry;
+  ClutterEOTF eotf;
+  ClutterLuminance luminance;
+  ClutterColorMasteringMetadata mastering;
+
+  /* Windows-BT.2100: BT.2020 primaries with the ST 2084 (PQ) transfer
+   * characteristic. Reference white is assumed 203 cd/m² per BT.2408. The
+   * target color volume is unspecified by the protocol; mastering metadata
+   * is intentionally left unset so tone mapping is bypassed, matching how
+   * Windows passes the PQ signal to the display without further
+   * adjustments. */
+  colorimetry = (ClutterColorimetry) {
+    .type = CLUTTER_COLORIMETRY_TYPE_COLORSPACE,
+    .colorspace = CLUTTER_COLORSPACE_BT2020,
+  };
+  eotf = (ClutterEOTF) {
+    .type = CLUTTER_EOTF_TYPE_NAMED,
+    .tf_name = CLUTTER_TRANSFER_FUNCTION_PQ,
+  };
+  luminance = (ClutterLuminance) {
+    .type = CLUTTER_LUMINANCE_TYPE_EXPLICIT,
+    .min = 0.005f,
+    .max = 10000.0f,
+    .ref = 203.0f,
+    .mastering_max = 10000.0f,
+  };
+  mastering = (ClutterColorMasteringMetadata) {
+    .has_primaries = TRUE,
+    .primaries = *clutter_colorspace_to_primaries (CLUTTER_COLORSPACE_BT2020),
+  };
+
+  color_state =
+    clutter_color_state_params_new_with_mastering (clutter_context,
+                                                   colorimetry,
+                                                   eotf,
+                                                   luminance,
+                                                   &mastering);
+
+  image_desc_resource =
+    wl_resource_create (client,
+                        &wp_image_description_v1_interface,
+                        wl_resource_get_version (resource),
+                        id);
+
+  image_desc =
+    meta_wayland_image_description_new (color_manager,
+                                       image_desc_resource);
+  meta_wayland_image_description_set_ready (image_desc,
+                                            color_state,
+                                            META_WAYLAND_IMAGE_DESCRIPTION_FLAGS_DEFAULT |
+                                            META_WAYLAND_IMAGE_DESCRIPTION_FLAGS_ALLOW_INFO);
+
+  wl_resource_set_implementation (image_desc_resource,
+                                  &meta_wayland_image_description_interface,
+                                  image_desc,
+                                  image_description_destructor);
+}
+
+static void
 color_manager_get_image_description (struct wl_client   *client,
                                      struct wl_resource *resource,
                                      uint32_t            image_description,
@@ -2002,6 +2070,11 @@ color_manager_send_supported_events (struct wl_resource *resource)
                                               WP_COLOR_MANAGER_V1_FEATURE_EXTENDED_TARGET_VOLUME);
   wp_color_manager_v1_send_supported_feature (resource,
                                               WP_COLOR_MANAGER_V1_FEATURE_WINDOWS_SCRGB);
+  if (wl_resource_get_version (resource) >= 3)
+    {
+      wp_color_manager_v1_send_supported_feature (resource,
+                                                  WP_COLOR_MANAGER_V1_FEATURE_WINDOWS_BT2100);
+    }
   wp_color_manager_v1_send_supported_tf_named (resource,
                                                WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_GAMMA22);
   wp_color_manager_v1_send_supported_tf_named (resource,
@@ -2050,6 +2123,7 @@ static const struct wp_color_manager_v1_interface
   color_manager_create_parametric_creator,
   color_manager_create_windows_scrgb,
   color_manager_get_image_description,
+  color_manager_create_windows_bt2100,
 };
 
 static void

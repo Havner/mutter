@@ -860,7 +860,7 @@ handle_registry_global (void               *user_data,
     {
       display->color_management_mgr =
         wl_registry_bind (registry, id,
-                          &wp_color_manager_v1_interface, 1);
+                          &wp_color_manager_v1_interface, 3);
     }
   else if (strcmp (interface, wp_cursor_shape_manager_v1_interface.name) == 0)
     {

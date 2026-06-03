@@ -30,7 +30,7 @@
 
 typedef struct _ImageDescriptionContext
 {
-  uint32_t image_description_id;
+  uint64_t image_description_id;
   gboolean creation_failed;
 } ImageDescriptionContext;
 
@@ -127,9 +127,22 @@ handle_image_description_ready (void                           *data,
   image_description_context->image_description_id = identity;
 }
 
+static void
+handle_image_description_ready2 (void                           *data,
+                                 struct wp_image_description_v1 *image_description_v4,
+                                 uint32_t                        identity_high,
+                                 uint32_t                        identity_low)
+{
+  ImageDescriptionContext *image_description_context = data;
+
+  image_description_context->image_description_id =
+    ((uint64_t) identity_high << 32) | identity_low;
+}
+
 static const struct wp_image_description_v1_listener image_description_listener = {
   handle_image_description_failed,
   handle_image_description_ready,
+  handle_image_description_ready2,
 };
 
 static void
@@ -328,6 +341,28 @@ create_image_description_windows_scrgb (WaylandDisplay                  *display
   g_assert_cmpint (image_description_context.image_description_id, >, 0);
 }
 
+static void
+create_image_description_windows_bt2100 (WaylandDisplay                  *display,
+                                         struct wp_image_description_v1 **image_description)
+{
+  ImageDescriptionContext image_description_context;
+
+  image_description_context.image_description_id = 0;
+  image_description_context.creation_failed = FALSE;
+
+  *image_description =
+    wp_color_manager_v1_create_windows_bt2100 (display->color_management_mgr);
+  wp_image_description_v1_add_listener (
+    *image_description,
+    &image_description_listener,
+    &image_description_context);
+
+  wait_for_image_description_ready (&image_description_context, display);
+
+  g_assert_false (image_description_context.creation_failed);
+  g_assert_cmpint (image_description_context.image_description_id, >, 0);
+}
+
 int
 main (int    argc,
       char **argv)
@@ -382,7 +417,7 @@ main (int    argc,
                                         &image_description,
                                         WP_COLOR_MANAGER_V1_PRIMARIES_SRGB,
                                         NULL,
-                                        WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_SRGB,
+                                        WP_COLOR_MANAGER_V1_TRANSFER_FUNCTION_COMPOUND_POWER_2_4,
                                         -1.0f,
                                         0.2f,
                                         80.0f,
@@ -464,6 +499,19 @@ main (int    argc,
 
   test_driver_sync_point (display->test_driver, 6, NULL);
   wait_for_sync_event (display, 6);
+
+  create_image_description_windows_bt2100 (display, &image_description);
+  wp_color_management_surface_v1_set_image_description (
+    color_surface,
+    image_description,
+    WP_COLOR_MANAGER_V1_RENDER_INTENT_PERCEPTUAL);
+
+  wl_surface_commit (surface);
+
+  wp_image_description_v1_destroy (image_description);
+
+  test_driver_sync_point (display->test_driver, 7, NULL);
+  wait_for_sync_event (display, 7);
 
   wp_color_management_surface_v1_destroy (color_surface);
 
