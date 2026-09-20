@@ -41,6 +41,14 @@
 #include "x11/meta-x11-frame.h"
 #include "x11/window-x11-private.h"
 
+#ifdef HAVE_XWAYLAND
+#include <float.h>
+#include <math.h>
+#include "wayland/meta-wayland-private.h"
+#include "wayland/meta-wayland-surface-private.h"
+#include "wayland/meta-xwayland.h"
+#endif
+
 struct _MetaWindowActorX11
 {
   MetaWindowActor parent;
@@ -1431,6 +1439,66 @@ meta_window_actor_x11_dispose (GObject *object)
   G_OBJECT_CLASS (meta_window_actor_x11_parent_class)->dispose (object);
 }
 
+#ifdef HAVE_XWAYLAND
+static void
+meta_window_actor_x11_apply_transform (ClutterActor      *actor,
+                                       graphene_matrix_t *matrix)
+{
+  ClutterActorClass *parent_class =
+    CLUTTER_ACTOR_CLASS (meta_window_actor_x11_parent_class);
+  MetaWindow *window;
+  MetaWaylandSurface *surface;
+  MetaLogicalMonitor *logical_monitor;
+  ClutterActor *parent;
+  MtkRectangle monitor_rect;
+  float scale, abs_x, abs_y, rel_x, rel_y, x_off, y_off;
+
+  parent_class->apply_transform (actor, matrix);
+
+  /* In absolute Xwayland scaling mode, align the window's on-display position to
+   * the physical pixel grid so its (native-resolution) surface blits 1:1
+   * without sub-pixel resampling. This mirrors what
+   * MetaSurfaceContainerActorWayland does for native Wayland windows; the
+   * matching size snap lives in meta_surface_actor_wayland_apply_transform().
+   * It is done on the window actor (not the surface actor) because only the
+   * window actor's transform is recomputed as the window moves. */
+  window = meta_window_actor_get_meta_window (META_WINDOW_ACTOR (actor));
+  if (!window)
+    return;
+
+  surface = meta_window_get_wayland_surface (window);
+  if (!surface || !meta_wayland_surface_is_xwayland (surface))
+    return;
+
+  if (!meta_xwayland_is_scaling_factor_absolute (&surface->compositor->xwayland_manager))
+    return;
+
+  logical_monitor = meta_window_get_highest_scale_monitor (window);
+  if (!logical_monitor)
+    return;
+
+  scale = meta_logical_monitor_get_scale (logical_monitor);
+  monitor_rect = meta_logical_monitor_get_layout (logical_monitor);
+
+  parent = clutter_actor_get_parent (actor);
+  abs_x = (parent ? clutter_actor_get_x (parent) : 0.0f) +
+          clutter_actor_get_x (actor);
+  abs_y = (parent ? clutter_actor_get_y (parent) : 0.0f) +
+          clutter_actor_get_y (actor);
+
+  rel_x = abs_x - monitor_rect.x;
+  rel_y = abs_y - monitor_rect.y;
+
+  x_off = roundf (rel_x * scale) / scale - rel_x;
+  y_off = roundf (rel_y * scale) / scale - rel_y;
+
+  if (!G_APPROX_VALUE (x_off, 0.0, FLT_EPSILON) ||
+      !G_APPROX_VALUE (y_off, 0.0, FLT_EPSILON))
+    graphene_matrix_translate (matrix,
+                               &GRAPHENE_POINT3D_INIT (x_off, y_off, 0.0));
+}
+#endif
+
 static void
 meta_window_actor_x11_class_init (MetaWindowActorX11Class *klass)
 {
@@ -1453,6 +1521,9 @@ meta_window_actor_x11_class_init (MetaWindowActorX11Class *klass)
 
   actor_class->paint = meta_window_actor_x11_paint;
   actor_class->get_paint_volume = meta_window_actor_x11_get_paint_volume;
+#ifdef HAVE_XWAYLAND
+  actor_class->apply_transform = meta_window_actor_x11_apply_transform;
+#endif
 
   object_class->constructed = meta_window_actor_x11_constructed;
   object_class->dispose = meta_window_actor_x11_dispose;

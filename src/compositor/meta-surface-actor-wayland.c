@@ -36,6 +36,9 @@
 #include "wayland/meta-wayland-private.h"
 #include "wayland/meta-wayland-subsurface.h"
 #include "wayland/meta-window-wayland.h"
+#ifdef HAVE_XWAYLAND
+#include "wayland/meta-xwayland.h"
+#endif
 
 struct _MetaSurfaceActorWayland
 {
@@ -170,6 +173,7 @@ meta_surface_actor_wayland_apply_transform (ClutterActor      *actor,
   float adj_actor_x, adj_actor_y;
   float width_scale, height_scale;
   float x_off, y_off;
+  gboolean is_xwayland_absolute = FALSE;
 
   if (!surface)
     goto out;
@@ -182,7 +186,15 @@ meta_surface_actor_wayland_apply_transform (ClutterActor      *actor,
   if (!window)
     goto out;
 
-  if (!META_IS_WINDOW_WAYLAND (window))
+#ifdef HAVE_XWAYLAND
+  /* Xwayland surfaces are normally left off-grid, but in absolute mode we want
+   * them snapped to physical pixels like native Wayland surfaces. */
+  is_xwayland_absolute =
+    meta_wayland_surface_is_xwayland (root_surface) &&
+    meta_xwayland_is_scaling_factor_absolute (&root_surface->compositor->xwayland_manager);
+#endif
+
+  if (!META_IS_WINDOW_WAYLAND (window) && !is_xwayland_absolute)
     goto out;
 
   logical_monitor = meta_window_get_highest_scale_monitor (window);
@@ -224,8 +236,34 @@ meta_surface_actor_wayland_apply_transform (ClutterActor      *actor,
     }
   else
     {
+      /* Snap the actor size to the physical pixel grid. The on-display position
+       * is aligned separately: for Wayland windows by
+       * MetaSurfaceContainerActorWayland, and for absolute Xwayland windows by
+       * meta_window_actor_x11_apply_transform(). */
       adj_actor_width = roundf (actor_width * scale) / scale;
       adj_actor_height = roundf (actor_height * scale) / scale;
+
+#ifdef HAVE_XWAYLAND
+      if (is_xwayland_absolute)
+        {
+          float effective_scale =
+            meta_xwayland_get_effective_scale (&root_surface->compositor->xwayland_manager);
+          int buffer_width = meta_wayland_surface_get_buffer_width (surface);
+          int buffer_height = meta_wayland_surface_get_buffer_height (surface);
+
+          /* The generic snap above rounds the (already rounded) logical size
+           * again, so buffer -> logical -> physical need not land back on the
+           * buffer size, leaving a resampled row/column at some sizes. Target
+           * the exact physical size (buffer / effective_scale * scale ==
+           * buffer * factor) instead, for a clean 1:1 (or integer) blit. */
+          if (effective_scale > 0.0f && buffer_width > 0 && buffer_height > 0)
+            {
+              adj_actor_width = buffer_width / effective_scale;
+              adj_actor_height = buffer_height / effective_scale;
+            }
+        }
+#endif
+
       adj_actor_x = allocation->x1;
       adj_actor_y = allocation->y1;
     }

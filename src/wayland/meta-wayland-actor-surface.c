@@ -188,6 +188,15 @@ meta_wayland_actor_surface_real_sync_actor_state (MetaWaylandActorSurface *actor
     stex,
     meta_wayland_surface_is_xwayland (surface) &&
     meta_xwayland_is_scaling_nearest (&surface->compositor->xwayland_manager));
+
+  /* In absolute mode the surface actor's physical-pixel snap
+   * (meta_surface_actor_wayland_apply_transform()) depends on the committed
+   * buffer size. A new buffer (e.g. a resize) does not invalidate the cached
+   * transform on its own, so force it here to avoid a stale snap that would
+   * leave the surface off-grid until the next relayout. */
+  if (meta_wayland_surface_is_xwayland (surface) &&
+      meta_xwayland_is_scaling_factor_absolute (&surface->compositor->xwayland_manager))
+    clutter_actor_invalidate_transform (CLUTTER_ACTOR (surface_actor));
 #endif
 
   buffer = meta_wayland_surface_get_buffer (surface);
