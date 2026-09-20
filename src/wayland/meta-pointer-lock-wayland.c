@@ -37,6 +37,8 @@
 
 #include "backends/meta-backend-private.h"
 #include "compositor/meta-surface-actor-wayland.h"
+#include "wayland/meta-wayland-private.h"
+#include "wayland/meta-xwayland.h"
 
 struct _MetaPointerLockWayland
 {
@@ -53,8 +55,11 @@ maybe_scale_for_xwayland (MetaWaylandSurface *surface,
 {
   if (meta_wayland_surface_is_xwayland (surface))
     {
-      *x /= surface->applied_state.scale;
-      *y /= surface->applied_state.scale;
+      float scale =
+        meta_xwayland_get_effective_scale (&surface->compositor->xwayland_manager);
+
+      *x /= scale;
+      *y /= scale;
     }
 }
 

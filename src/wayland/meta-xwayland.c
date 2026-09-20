@@ -1381,12 +1381,33 @@ meta_xwayland_get_effective_scale (MetaXWaylandManager *manager)
       {
         MetaSettings *settings = meta_backend_get_settings (backend);
         float scaling_factor;
+        gboolean has_factor;
 
-        if (meta_settings_get_xwayland_scaling_factor (settings,
-                                                       &scaling_factor))
+        has_factor = meta_settings_get_xwayland_scaling_factor (settings,
+                                                               &scaling_factor);
+
+        if (meta_settings_is_xwayland_scaling_factor_absolute (settings))
+          {
+            /* In absolute mode the configured factor is the physical scale the
+             * window should keep regardless of the desktop scale. X11 clients
+             * are told the scale is 100% (see
+             * meta_xwayland_get_x11_ui_scaling_factor()), and the compositor
+             * scales their windows by highest_monitor_scale / factor so that
+             * the resulting physical size is independent of the desktop scale.
+             * The factor is used as-is (not rounded). As a special case, 0
+             * (auto) means "follow the desktop scale": the factor becomes the
+             * current desktop (monitor) scale, so the window's physical size
+             * tracks the desktop scale (e.g. 1.25 at 125%). */
+            float factor = has_factor ? scaling_factor
+                                      : (float) manager->highest_monitor_scale;
+
+            return (float) (manager->highest_monitor_scale / factor);
+          }
+
+        if (has_factor)
           return roundf (scaling_factor);
         else
-          return ceilf (manager->highest_monitor_scale);
+          return (float) ceil (manager->highest_monitor_scale);
       }
     }
 
@@ -1417,6 +1438,17 @@ meta_xwayland_get_x11_ui_scaling_factor (MetaXWaylandManager *manager)
     }
 
   g_assert_not_reached ();
+}
+
+gboolean
+meta_xwayland_is_scaling_factor_absolute (MetaXWaylandManager *manager)
+{
+  MetaWaylandCompositor *compositor = manager->compositor;
+  MetaContext *context = meta_wayland_compositor_get_context (compositor);
+  MetaBackend *backend = meta_context_get_backend (context);
+  MetaSettings *settings = meta_backend_get_settings (backend);
+
+  return meta_settings_is_xwayland_scaling_factor_absolute (settings);
 }
 
 const char *

@@ -455,7 +455,8 @@ meta_window_xwayland_stage_to_protocol_size (MetaWindow *window,
   scale_w = scale_h = meta_xwayland_get_effective_scale (xwayland_manager);
 
   surface = meta_window_get_wayland_surface (window);
-  if (surface && surface->viewport.has_dst_size)
+  if (surface && surface->viewport.has_dst_size &&
+      !meta_xwayland_is_scaling_factor_absolute (xwayland_manager))
     {
       if (protocol_w)
         scale_w /= get_viewport_scale_x (surface);
@@ -527,7 +528,8 @@ meta_window_xwayland_protocol_to_stage_size (MetaWindow *window,
   scale_w = scale_h = 1.0f / xwayland_scale;
 
   surface = meta_window_get_wayland_surface (window);
-  if (surface && surface->viewport.has_dst_size)
+  if (surface && surface->viewport.has_dst_size &&
+      !meta_xwayland_is_scaling_factor_absolute (xwayland_manager))
     {
       if (stage_w)
         scale_w *= get_viewport_scale_x (surface);

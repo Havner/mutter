@@ -175,7 +175,9 @@ meta_xwayland_surface_get_relative_coordinates (MetaWaylandSurfaceRole *surface_
   MetaWaylandSurface *surface =
     meta_wayland_surface_role_get_surface (surface_role);
   MtkRectangle window_rect = { 0 };
-  int xwayland_scale = surface->applied_state.scale;
+  MetaXWaylandManager *xwayland_manager =
+    &surface->compositor->xwayland_manager;
+  float xwayland_scale = meta_xwayland_get_effective_scale (xwayland_manager);
 
   if (xwayland_surface->window)
     meta_window_get_buffer_rect (xwayland_surface->window, &window_rect);

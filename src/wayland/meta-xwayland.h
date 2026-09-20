@@ -47,6 +47,8 @@ gboolean meta_xwayland_signal (MetaXWaylandManager  *manager,
 
 float meta_xwayland_get_effective_scale (MetaXWaylandManager *manager);
 
+gboolean meta_xwayland_is_scaling_factor_absolute (MetaXWaylandManager *manager);
+
 int meta_xwayland_get_x11_ui_scaling_factor (MetaXWaylandManager *manager);
 
 const char * meta_xwayland_get_public_display_name (MetaXWaylandManager *manager);

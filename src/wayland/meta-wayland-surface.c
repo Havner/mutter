@@ -961,9 +961,40 @@ meta_wayland_surface_apply_state (MetaWaylandSurface      *surface,
 #ifdef HAVE_XWAYLAND
       MetaXWaylandManager *xwayland_manager =
         &surface->compositor->xwayland_manager;
+      float effective_scale =
+        meta_xwayland_get_effective_scale (xwayland_manager);
+      gboolean client_viewport =
+        surface->viewport.has_src_rect ||
+        (state->has_new_viewport_dst_size && state->viewport_dst_width > 0);
 
-      surface->applied_state.scale =
-        (int) roundf (meta_xwayland_get_effective_scale (xwayland_manager));
+      if (meta_xwayland_is_scaling_factor_absolute (xwayland_manager) &&
+          surface->buffer && !client_viewport)
+        {
+          /* In absolute mode the effective scale is fractional. Since the
+           * Wayland buffer scale must stay an integer, express the scaling via
+           * a compositor-imposed viewport destination size instead, so the
+           * window ends up at buffer_size / effective_scale logical pixels. */
+          int buffer_width = meta_wayland_surface_get_buffer_width (surface);
+          int buffer_height = meta_wayland_surface_get_buffer_height (surface);
+
+          surface->applied_state.scale = 1;
+          surface->viewport.dst_width =
+            (int) roundf (buffer_width / effective_scale);
+          surface->viewport.dst_height =
+            (int) roundf (buffer_height / effective_scale);
+          surface->viewport.has_dst_size =
+            surface->viewport.dst_width > 0 &&
+            surface->viewport.dst_height > 0;
+        }
+      else
+        {
+          surface->applied_state.scale = (int) roundf (effective_scale);
+
+          /* Drop any destination size previously imposed for absolute mode
+           * (client-driven viewports are left untouched). */
+          if (!client_viewport)
+            surface->viewport.has_dst_size = FALSE;
+        }
 #endif
     }
   else if (state->scale > 0)
@@ -1026,7 +1057,36 @@ meta_wayland_surface_apply_state (MetaWaylandSurface      *surface,
 
       if (state->input_region)
         {
+          gboolean scaled = FALSE;
+
+#ifdef HAVE_XWAYLAND
+          /* In absolute mode the buffer->surface scale is fractional and
+           * applied_state.scale is 1, so map the buffer-space region (rootless
+           * Xwayland always uses buffer scale 1) to surface-local coordinates
+           * using the surface (viewport) size. */
           if (meta_wayland_surface_is_xwayland (surface) &&
+              meta_xwayland_is_scaling_factor_absolute (&surface->compositor->xwayland_manager))
+            {
+              int buffer_width = meta_wayland_surface_get_buffer_width (surface);
+              int buffer_height = meta_wayland_surface_get_buffer_height (surface);
+
+              if (buffer_width > 0 && buffer_height > 0)
+                {
+                  graphene_rect_t src_rect =
+                    GRAPHENE_RECT_INIT (0.0f, 0.0f,
+                                        meta_wayland_surface_get_width (surface),
+                                        meta_wayland_surface_get_height (surface));
+
+                  surface->input_region =
+                    mtk_region_crop_and_scale (state->input_region, &src_rect,
+                                               buffer_width, buffer_height);
+                  scaled = TRUE;
+                }
+            }
+#endif
+
+          if (!scaled &&
+              meta_wayland_surface_is_xwayland (surface) &&
               surface->applied_state.scale > 1)
             {
               /* Compensate for rootless Xwayland always calculating region based
@@ -1035,11 +1095,11 @@ meta_wayland_surface_apply_state (MetaWaylandSurface      *surface,
               surface->input_region =
                 mtk_region_downscale (state->input_region,
                                       surface->applied_state.scale);
+              scaled = TRUE;
             }
-          else
-            {
-              surface->input_region = mtk_region_ref (state->input_region);
-            }
+
+          if (!scaled)
+            surface->input_region = mtk_region_ref (state->input_region);
         }
     }
 
