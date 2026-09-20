@@ -1408,6 +1408,11 @@ meta_xwayland_get_x11_ui_scaling_factor (MetaXWaylandManager *manager)
     case META_LOGICAL_MONITOR_LAYOUT_MODE_PHYSICAL:
       return meta_settings_get_ui_scaling_factor (settings);
     case META_LOGICAL_MONITOR_LAYOUT_MODE_LOGICAL:
+      /* In absolute mode X11 clients are always told the scale is 100% so that
+       * they don't scale themselves; the compositor scales their windows on its
+       * own instead (see meta_xwayland_get_effective_scale()). */
+      if (meta_settings_is_xwayland_scaling_factor_absolute (settings))
+        return 1;
       return meta_xwayland_get_effective_scale (manager);
     }
 
