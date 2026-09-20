@@ -135,7 +135,7 @@ stage_to_protocol (MetaX11Display *x11_display,
 {
   MetaDisplay *display = meta_x11_display_get_display (x11_display);
   MetaContext *context = meta_display_get_context (display);
-  int scale = 1;
+  float scale;
 
   MetaWaylandCompositor *wayland_compositor =
     meta_context_get_wayland_compositor (context);
@@ -145,9 +145,9 @@ stage_to_protocol (MetaX11Display *x11_display,
   scale = meta_xwayland_get_effective_scale (xwayland_manager);
 
   if (protocol_x)
-    *protocol_x = stage_x * scale;
+    *protocol_x = (int) roundf (stage_x * scale);
   if (protocol_y)
-    *protocol_y = stage_y * scale;
+    *protocol_y = (int) roundf (stage_y * scale);
 }
 
 static void

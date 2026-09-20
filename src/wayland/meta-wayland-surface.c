@@ -963,7 +963,7 @@ meta_wayland_surface_apply_state (MetaWaylandSurface      *surface,
         &surface->compositor->xwayland_manager;
 
       surface->applied_state.scale =
-        meta_xwayland_get_effective_scale (xwayland_manager);
+        (int) roundf (meta_xwayland_get_effective_scale (xwayland_manager));
 #endif
     }
   else if (state->scale > 0)
@@ -1725,7 +1725,8 @@ meta_wayland_surface_update_outputs (MetaWaylandSurface *surface)
       MetaXWaylandManager *xwayland_manager =
         &surface->compositor->xwayland_manager;
 
-      surface->applied_state.scale = meta_xwayland_get_effective_scale (xwayland_manager);
+      surface->applied_state.scale =
+        (int) roundf (meta_xwayland_get_effective_scale (xwayland_manager));
 #endif
     }
 }

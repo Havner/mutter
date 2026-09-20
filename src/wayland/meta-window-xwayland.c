@@ -489,7 +489,7 @@ meta_window_xwayland_protocol_to_stage (MetaWindow          *window,
   MetaWaylandCompositor *wayland_compositor =
     meta_context_get_wayland_compositor (context);
   MetaXWaylandManager *xwayland_manager = &wayland_compositor->xwayland_manager;
-  int xwayland_scale;
+  float xwayland_scale;
   float scale;
 
   xwayland_scale = meta_xwayland_get_effective_scale (xwayland_manager);
@@ -520,7 +520,7 @@ meta_window_xwayland_protocol_to_stage_size (MetaWindow *window,
     meta_context_get_wayland_compositor (context);
   MetaXWaylandManager *xwayland_manager = &wayland_compositor->xwayland_manager;
   MetaWaylandSurface *surface;
-  int xwayland_scale;
+  float xwayland_scale;
   float scale_w, scale_h;
 
   xwayland_scale = meta_xwayland_get_effective_scale (xwayland_manager);

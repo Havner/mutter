@@ -1364,7 +1364,7 @@ meta_xwayland_set_should_enable_ei_portal (MetaXWaylandManager  *manager,
   manager->should_enable_ei_portal = should_enable_ei_portal;
 }
 
-int
+float
 meta_xwayland_get_effective_scale (MetaXWaylandManager *manager)
 {
   MetaWaylandCompositor *compositor = manager->compositor;
@@ -1376,7 +1376,7 @@ meta_xwayland_get_effective_scale (MetaXWaylandManager *manager)
   switch (meta_monitor_manager_get_layout_mode (monitor_manager))
     {
     case META_LOGICAL_MONITOR_LAYOUT_MODE_PHYSICAL:
-      return 1;
+      return 1.0f;
     case META_LOGICAL_MONITOR_LAYOUT_MODE_LOGICAL:
       {
         MetaSettings *settings = meta_backend_get_settings (backend);
@@ -1384,9 +1384,9 @@ meta_xwayland_get_effective_scale (MetaXWaylandManager *manager)
 
         if (meta_settings_get_xwayland_scaling_factor (settings,
                                                        &scaling_factor))
-          return (int) roundf (scaling_factor);
+          return roundf (scaling_factor);
         else
-          return (int) ceil (manager->highest_monitor_scale);
+          return ceilf (manager->highest_monitor_scale);
       }
     }
 
@@ -1413,7 +1413,7 @@ meta_xwayland_get_x11_ui_scaling_factor (MetaXWaylandManager *manager)
        * own instead (see meta_xwayland_get_effective_scale()). */
       if (meta_settings_is_xwayland_scaling_factor_absolute (settings))
         return 1;
-      return meta_xwayland_get_effective_scale (manager);
+      return (int) meta_xwayland_get_effective_scale (manager);
     }
 
   g_assert_not_reached ();

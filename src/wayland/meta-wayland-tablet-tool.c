@@ -523,7 +523,7 @@ tool_set_cursor (struct wl_client   *client,
         {
           MetaXWaylandManager *xwayland_manager =
             &surface->compositor->xwayland_manager;
-          int scale;
+          float scale;
 
           scale = meta_xwayland_get_effective_scale (xwayland_manager);
           hot_x = (int32_t) round (hot_x / (double) scale);

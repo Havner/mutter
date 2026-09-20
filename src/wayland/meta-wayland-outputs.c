@@ -71,7 +71,7 @@ struct _MetaWaylandOutput
   MetaMonitor *monitor;
 
 #ifdef HAVE_XWAYLAND
-  int xwayland_scale;
+  float xwayland_scale;
 #endif
 };
 
@@ -213,11 +213,11 @@ maybe_scale_for_xwayland (MetaWaylandOutput  *wayland_output,
     {
       MetaXWaylandManager *xwayland_manager =
         &wayland_output->compositor->xwayland_manager;
-      int xwayland_scale;
+      float xwayland_scale;
 
       xwayland_scale = meta_xwayland_get_effective_scale (xwayland_manager);
-      *x *= xwayland_scale;
-      *y *= xwayland_scale;
+      *x = (int) roundf (*x * xwayland_scale);
+      *y = (int) roundf (*y * xwayland_scale);
     }
 #endif
 }
