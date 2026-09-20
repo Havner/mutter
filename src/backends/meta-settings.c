@@ -84,6 +84,7 @@ struct _MetaSettings
   gboolean xwayland_allow_byte_swapped_clients;
 
   float xwayland_scaling_factor;
+  gboolean xwayland_scaling_factor_absolute;
 };
 
 G_DEFINE_TYPE (MetaSettings, meta_settings, G_TYPE_OBJECT)
@@ -428,6 +429,14 @@ update_xwayland_scaling_factor (MetaSettings *settings)
 }
 
 static void
+update_xwayland_scaling_factor_absolute (MetaSettings *settings)
+{
+  settings->xwayland_scaling_factor_absolute =
+    g_settings_get_boolean (settings->wayland_settings,
+                            "xwayland-scaling-factor-absolute");
+}
+
+static void
 wayland_settings_changed (GSettings    *wayland_settings,
                           gchar        *key,
                           MetaSettings *settings)
@@ -452,6 +461,11 @@ wayland_settings_changed (GSettings    *wayland_settings,
   else if (g_str_equal (key, "xwayland-scaling-factor"))
     {
       update_xwayland_scaling_factor (settings);
+      g_signal_emit (settings, signals[XWAYLAND_SCALING_FACTOR_CHANGED], 0);
+    }
+  else if (g_str_equal (key, "xwayland-scaling-factor-absolute"))
+    {
+      update_xwayland_scaling_factor_absolute (settings);
       g_signal_emit (settings, signals[XWAYLAND_SCALING_FACTOR_CHANGED], 0);
     }
 }
@@ -496,6 +510,12 @@ meta_settings_get_xwayland_scaling_factor (MetaSettings *settings,
       *scaling_factor = settings->xwayland_scaling_factor;
       return TRUE;
     }
+}
+
+gboolean
+meta_settings_is_xwayland_scaling_factor_absolute (MetaSettings *settings)
+{
+  return settings->xwayland_scaling_factor_absolute;
 }
 
 gboolean
@@ -605,6 +625,7 @@ meta_settings_init (MetaSettings *settings)
   update_privacy_settings (settings);
   update_xwayland_allow_byte_swapped_clients (settings);
   update_xwayland_scaling_factor (settings);
+  update_xwayland_scaling_factor_absolute (settings);
 }
 
 static void

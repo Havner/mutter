@@ -76,6 +76,8 @@ gboolean meta_settings_are_xwayland_byte_swapped_clients_allowed (MetaSettings *
 gboolean meta_settings_get_xwayland_scaling_factor (MetaSettings *settings,
                                                     float        *scaling_factor);
 
+gboolean meta_settings_is_xwayland_scaling_factor_absolute (MetaSettings *settings);
+
 gboolean meta_settings_is_privacy_screen_enabled (MetaSettings *settings);
 
 void meta_settings_set_privacy_screen_enabled (MetaSettings *settings,

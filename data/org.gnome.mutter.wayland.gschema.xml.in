@@ -161,6 +161,23 @@
       </description>
     </key>
 
+    <key name="xwayland-scaling-factor-absolute" type="b">
+      <default>false</default>
+      <summary>Make the Xwayland scaling factor absolute</summary>
+      <description>
+        By default the Xwayland scaling factor is applied on top of the overall
+        desktop (monitor) scale, so an X11 window's physical size still tracks
+        the desktop scale. When this is enabled, the scale configured in
+        “xwayland-scaling-factor” is treated as absolute: X11 clients are always
+        told the scale is 100% (so they do not scale themselves), and the
+        compositor scales their windows independently of the desktop scale, so a
+        given window keeps the same physical size regardless of the desktop
+        scale. As a special case, a scaling factor of 0 in absolute mode means
+        the current desktop (monitor) scale is used as the factor, so the window
+        follows the desktop scale (e.g. 1.25 at 125%).
+      </description>
+    </key>
+
     <child name="keybindings" schema="org.gnome.mutter.wayland.keybindings"/>
   </schema>
 
