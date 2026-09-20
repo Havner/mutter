@@ -30,6 +30,7 @@
 #include "wayland/meta-window-wayland.h"
 
 #ifdef HAVE_XWAYLAND
+#include "wayland/meta-xwayland.h"
 #include "wayland/meta-xwayland-surface.h"
 #endif
 
@@ -179,6 +180,15 @@ meta_wayland_actor_surface_real_sync_actor_state (MetaWaylandActorSurface *actor
 
   surface_actor = priv->actor;
   stex = meta_surface_actor_get_texture (surface_actor);
+
+#ifdef HAVE_XWAYLAND
+  /* Only Xwayland surfaces use nearest-neighbor magnification, and only when the
+   * setting is enabled; native Wayland surfaces always use linear. */
+  meta_shaped_texture_set_nearest_scaling (
+    stex,
+    meta_wayland_surface_is_xwayland (surface) &&
+    meta_xwayland_is_scaling_nearest (&surface->compositor->xwayland_manager));
+#endif
 
   buffer = meta_wayland_surface_get_buffer (surface);
   if (buffer)

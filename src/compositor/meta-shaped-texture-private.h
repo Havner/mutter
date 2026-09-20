@@ -55,6 +55,8 @@ void meta_shaped_texture_set_viewport_dst_size (MetaShapedTexture *stex,
 void meta_shaped_texture_reset_viewport_dst_size (MetaShapedTexture *stex);
 void meta_shaped_texture_set_buffer_scale (MetaShapedTexture *stex,
                                            int                buffer_scale);
+void meta_shaped_texture_set_nearest_scaling (MetaShapedTexture *stex,
+                                              gboolean           nearest_scaling);
 
 gboolean meta_shaped_texture_update_area (MetaShapedTexture  *stex,
                                           const MtkRectangle *area,

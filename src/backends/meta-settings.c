@@ -85,6 +85,7 @@ struct _MetaSettings
 
   float xwayland_scaling_factor;
   gboolean xwayland_scaling_factor_absolute;
+  gboolean xwayland_scaling_nearest;
 };
 
 G_DEFINE_TYPE (MetaSettings, meta_settings, G_TYPE_OBJECT)
@@ -437,6 +438,14 @@ update_xwayland_scaling_factor_absolute (MetaSettings *settings)
 }
 
 static void
+update_xwayland_scaling_nearest (MetaSettings *settings)
+{
+  settings->xwayland_scaling_nearest =
+    g_settings_get_boolean (settings->wayland_settings,
+                            "xwayland-scaling-nearest");
+}
+
+static void
 wayland_settings_changed (GSettings    *wayland_settings,
                           gchar        *key,
                           MetaSettings *settings)
@@ -467,6 +476,10 @@ wayland_settings_changed (GSettings    *wayland_settings,
     {
       update_xwayland_scaling_factor_absolute (settings);
       g_signal_emit (settings, signals[XWAYLAND_SCALING_FACTOR_CHANGED], 0);
+    }
+  else if (g_str_equal (key, "xwayland-scaling-nearest"))
+    {
+      update_xwayland_scaling_nearest (settings);
     }
 }
 
@@ -516,6 +529,12 @@ gboolean
 meta_settings_is_xwayland_scaling_factor_absolute (MetaSettings *settings)
 {
   return settings->xwayland_scaling_factor_absolute;
+}
+
+gboolean
+meta_settings_is_xwayland_scaling_nearest (MetaSettings *settings)
+{
+  return settings->xwayland_scaling_nearest;
 }
 
 gboolean
@@ -626,6 +645,7 @@ meta_settings_init (MetaSettings *settings)
   update_xwayland_allow_byte_swapped_clients (settings);
   update_xwayland_scaling_factor (settings);
   update_xwayland_scaling_factor_absolute (settings);
+  update_xwayland_scaling_nearest (settings);
 }
 
 static void

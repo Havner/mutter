@@ -120,6 +120,7 @@ struct _MetaShapedTexture
   int buffer_scale;
 
   guint create_mipmaps : 1;
+  guint nearest_scaling : 1;
 
   MetaMultiTextureAlphaMode premult;
   MetaMultiTextureCoefficients coeffs;
@@ -781,7 +782,10 @@ do_paint_content (MetaShapedTexture   *stex,
   else
     {
       min_filter = COGL_PIPELINE_FILTER_LINEAR;
-      mag_filter = COGL_PIPELINE_FILTER_LINEAR;
+      if (stex->nearest_scaling)
+        mag_filter = COGL_PIPELINE_FILTER_NEAREST;
+      else
+        mag_filter = COGL_PIPELINE_FILTER_LINEAR;
 
       /* If we're painting a texture below half its native resolution
        * then mipmapping is required to avoid aliasing. If it's above
@@ -1074,6 +1078,21 @@ meta_shaped_texture_set_create_mipmaps (MetaShapedTexture *stex,
 
       if (!stex->create_mipmaps)
         meta_texture_mipmap_clear (stex->texture_mipmap);
+    }
+}
+
+void
+meta_shaped_texture_set_nearest_scaling (MetaShapedTexture *stex,
+                                         gboolean           nearest_scaling)
+{
+  g_return_if_fail (META_IS_SHAPED_TEXTURE (stex));
+
+  nearest_scaling = nearest_scaling != FALSE;
+
+  if (nearest_scaling != stex->nearest_scaling)
+    {
+      stex->nearest_scaling = nearest_scaling;
+      clutter_content_invalidate (CLUTTER_CONTENT (stex));
     }
 }
 

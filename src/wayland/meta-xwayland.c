@@ -1451,6 +1451,17 @@ meta_xwayland_is_scaling_factor_absolute (MetaXWaylandManager *manager)
   return meta_settings_is_xwayland_scaling_factor_absolute (settings);
 }
 
+gboolean
+meta_xwayland_is_scaling_nearest (MetaXWaylandManager *manager)
+{
+  MetaWaylandCompositor *compositor = manager->compositor;
+  MetaContext *context = meta_wayland_compositor_get_context (compositor);
+  MetaBackend *backend = meta_context_get_backend (context);
+  MetaSettings *settings = meta_backend_get_settings (backend);
+
+  return meta_settings_is_xwayland_scaling_nearest (settings);
+}
+
 const char *
 meta_xwayland_get_public_display_name (MetaXWaylandManager *manager)
 {

@@ -178,6 +178,18 @@
       </description>
     </key>
 
+    <key name="xwayland-scaling-nearest" type="b">
+      <default>false</default>
+      <summary>Use nearest-neighbor filtering when scaling up Xwayland windows</summary>
+      <description>
+        When enabled, Xwayland windows that are scaled up by the compositor are
+        magnified using nearest-neighbor interpolation instead of linear
+        interpolation. This keeps upscaled X11 content sharp at the cost of a
+        more pixelated look, and is most useful with integer Xwayland scaling
+        factors. Native Wayland windows are not affected.
+      </description>
+    </key>
+
     <child name="keybindings" schema="org.gnome.mutter.wayland.keybindings"/>
   </schema>
 
