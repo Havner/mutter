@@ -2716,6 +2716,40 @@ meta_wayland_surface_try_acquire_scanout (MetaWaylandSurface *surface,
       src_rect_ptr = &src_rect;
     }
 
+#ifdef HAVE_XWAYLAND
+  /* Scaled scanout is done by the KMS plane scaler, which doesn't honor the
+   * nearest-neighbor setting, so composite scaled Xwayland surfaces instead.
+   */
+  if (meta_wayland_surface_is_xwayland (surface) &&
+      meta_xwayland_is_scaling_nearest (&surface->compositor->xwayland_manager))
+    {
+      int src_width;
+      int src_height;
+
+      if (src_rect_ptr)
+        {
+          src_width = (int) roundf (src_rect.size.width);
+          src_height = (int) roundf (src_rect.size.height);
+        }
+      else
+        {
+          src_width = meta_wayland_surface_get_buffer_width (surface);
+          src_height = meta_wayland_surface_get_buffer_height (surface);
+        }
+
+      if (src_width != crtc_dst_rect.width ||
+          src_height != crtc_dst_rect.height)
+        {
+          meta_topic (META_DEBUG_RENDER,
+                      "Not scanning out surface: compositing scaled Xwayland "
+                      "surface (%dx%d -> %dx%d) for nearest scaling",
+                      src_width, src_height,
+                      crtc_dst_rect.width, crtc_dst_rect.height);
+          return NULL;
+        }
+    }
+#endif
+
   return meta_wayland_buffer_try_acquire_scanout (surface->buffer,
                                                   onscreen,
                                                   stage_view,
