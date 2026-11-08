@@ -70,6 +70,10 @@ meta_wayland_drm_syncobj_create_source (MetaWaylandBuffer                *buffer
                                         MetaWaylandDmaBufSourceDispatch   dispatch,
                                         gpointer                          user_data);
 
+gboolean
+meta_wayland_dma_buf_is_plane_compatible (MetaWaylandBuffer *buffer,
+                                          ClutterStageView  *stage_view);
+
 CoglScanout *
 meta_wayland_dma_buf_try_acquire_scanout (MetaWaylandBuffer     *buffer,
                                           CoglOnscreen          *onscreen,

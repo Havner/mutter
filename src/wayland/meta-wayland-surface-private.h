@@ -292,6 +292,11 @@ struct _MetaWaylandSurface
 
   /* dma-buf feedback */
   MetaCrtc *scanout_candidate;
+  /* When the scanout tranche was first offered since the last successful
+   * scanout (0: not offered), and whether it has been given up on because the
+   * client kept committing buffers the primary plane can't scan out. */
+  int64_t scanout_tranche_offered_us;
+  gboolean scanout_tranche_disabled;
 
   /* Transactions */
   struct {
@@ -434,6 +439,11 @@ MetaCrtc * meta_wayland_surface_get_scanout_candidate (MetaWaylandSurface *surfa
 
 void meta_wayland_surface_set_scanout_candidate (MetaWaylandSurface *surface,
                                                  MetaCrtc           *crtc);
+
+gboolean meta_wayland_surface_is_scanout_tranche_disabled (MetaWaylandSurface *surface);
+
+gboolean meta_wayland_surface_scanout_given_up (MetaWaylandSurface *surface,
+                                               ClutterStageView   *stage_view);
 
 int meta_wayland_surface_get_geometry_scale (MetaWaylandSurface *surface);
 

@@ -2638,11 +2638,75 @@ meta_wayland_surface_get_buffer_height (MetaWaylandSurface *surface)
     return 0;
 }
 
+/* How long a client gets, after it was first offered the scanout tranche, to
+ * switch to buffers the primary plane can scan out. Well-behaved clients
+ * reallocate within a few frames (Vulkan WSI: next acquire returns
+ * VK_ERROR_OUT_OF_DATE_KHR). */
+#define SCANOUT_TRANCHE_GRACE_US (G_USEC_PER_SEC)
+
+/*
+ * Stop offering the scanout tranche to a surface that keeps committing buffers
+ * the primary plane can't scan out long after it was offered.
+ *
+ * Re-offering is useless at that point, and some clients react badly to it: e.g.
+ * Indiana Jones and the Great Circle on NVIDIA via Wine stalls its GPU work for
+ * 2 s whenever the tranche arrives, recreates its swapchain, gets a compressed
+ * modifier again, and loops (~0.5 fps). Without the tranche it's composited at
+ * full rate. Only format/modifier failures count; the surface keeps being a
+ * scanout and fullscreen (VRR) candidate.
+ */
+static void
+maybe_disable_scanout_tranche (MetaWaylandSurface *surface,
+                               ClutterStageView   *stage_view)
+{
+  int64_t elapsed_us;
+
+  if (surface->scanout_tranche_disabled ||
+      !surface->scanout_tranche_offered_us ||
+      !surface->buffer)
+    return;
+
+  if (meta_wayland_dma_buf_is_plane_compatible (surface->buffer, stage_view))
+    return;
+
+  elapsed_us = g_get_monotonic_time () - surface->scanout_tranche_offered_us;
+  if (elapsed_us < SCANOUT_TRANCHE_GRACE_US)
+    return;
+
+  meta_topic (META_DEBUG_RENDER,
+              "Client still commits buffers the primary plane can't scan out "
+              "%.1f s after the scanout tranche was offered, not offering it "
+              "anymore", elapsed_us / (double) G_USEC_PER_SEC);
+  surface->scanout_tranche_disabled = TRUE;
+  /* Re-send the surface's dma-buf feedback without the scanout tranche */
+  g_object_notify_by_pspec (G_OBJECT (surface),
+                            obj_props[PROP_SCANOUT_CANDIDATE]);
+}
+
+gboolean
+meta_wayland_surface_is_scanout_tranche_disabled (MetaWaylandSurface *surface)
+{
+  return surface->scanout_tranche_disabled;
+}
+
+/* Once the scanout tranche was given up, don't keep attempting scanout on
+ * every frame with buffers the primary plane can't take. A buffer that happens
+ * to be scanout-capable is still tried. */
+gboolean
+meta_wayland_surface_scanout_given_up (MetaWaylandSurface *surface,
+                                       ClutterStageView   *stage_view)
+{
+  return surface->scanout_tranche_disabled &&
+         surface->buffer &&
+         !meta_wayland_dma_buf_is_plane_compatible (surface->buffer, stage_view);
+}
+
 CoglScanout *
 meta_wayland_surface_try_acquire_scanout (MetaWaylandSurface *surface,
                                           CoglOnscreen       *onscreen,
                                           ClutterStageView   *stage_view)
 {
+  CoglScanout *scanout;
   MetaSurfaceActor *surface_actor;
   MtkMonitorTransform view_transform;
   ClutterActorBox actor_box;
@@ -2750,11 +2814,17 @@ meta_wayland_surface_try_acquire_scanout (MetaWaylandSurface *surface,
     }
 #endif
 
-  return meta_wayland_buffer_try_acquire_scanout (surface->buffer,
-                                                  onscreen,
-                                                  stage_view,
-                                                  src_rect_ptr,
-                                                  &crtc_dst_rect);
+  scanout = meta_wayland_buffer_try_acquire_scanout (surface->buffer,
+                                                     onscreen,
+                                                     stage_view,
+                                                     src_rect_ptr,
+                                                     &crtc_dst_rect);
+  if (scanout)
+    surface->scanout_tranche_offered_us = 0;
+  else
+    maybe_disable_scanout_tranche (surface, stage_view);
+
+  return scanout;
 }
 
 MetaCrtc *
@@ -2771,6 +2841,8 @@ meta_wayland_surface_set_scanout_candidate (MetaWaylandSurface *surface,
     return;
 
   g_set_object (&surface->scanout_candidate, crtc);
+  if (crtc && !surface->scanout_tranche_offered_us)
+    surface->scanout_tranche_offered_us = g_get_monotonic_time ();
   g_object_notify_by_pspec (G_OBJECT (surface),
                             obj_props[PROP_SCANOUT_CANDIDATE]);
 }

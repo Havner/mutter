@@ -362,6 +362,14 @@ find_scanout_candidate (MetaCompositorView  *compositor_view,
       return FALSE;
     }
 
+  if (meta_wayland_surface_scanout_given_up (surface, CLUTTER_STAGE_VIEW (view)))
+    {
+      meta_topic (META_DEBUG_RENDER,
+                  "No direct scanout candidate: client can't provide "
+                  "scanout-capable buffers");
+      return FALSE;
+    }
+
   if (!(meta_get_debug_paint_flags () &
         META_DEBUG_PAINT_IGNORE_COLOR_STATE_FOR_DIRECT_SCANOUT))
     {

@@ -638,6 +638,42 @@ crtc_supports_modifier (MetaCrtcKms *crtc_kms,
   return has_modifier (crtc_modifiers, drm_modifier);
 }
 
+/* Whether the buffer's format/modifier could be put on the view's primary
+ * plane. Non-dma-buf buffers and non-KMS views report TRUE: this is only meant
+ * to recognize "wrong format/modifier" scanout failures. */
+gboolean
+meta_wayland_dma_buf_is_plane_compatible (MetaWaylandBuffer *buffer,
+                                          ClutterStageView  *stage_view)
+{
+  MetaWaylandDmaBufBuffer *dma_buf;
+  const MetaFormatInfo *format_info;
+  MetaCrtc *crtc;
+  MetaCrtcKms *crtc_kms;
+
+  dma_buf = meta_wayland_dma_buf_from_buffer (buffer);
+  if (!dma_buf)
+    return TRUE;
+
+  crtc = meta_renderer_view_get_crtc (META_RENDERER_VIEW (stage_view));
+  if (!META_IS_CRTC_KMS (crtc))
+    return TRUE;
+  crtc_kms = META_CRTC_KMS (crtc);
+
+  format_info = meta_format_info_from_drm_format (dma_buf->drm_format);
+  if (!format_info)
+    return TRUE;
+
+  if (format_info->opaque_substitute != DRM_FORMAT_INVALID &&
+      crtc_supports_modifier (crtc_kms,
+                              format_info->opaque_substitute,
+                              dma_buf->drm_modifier))
+    return TRUE;
+
+  return crtc_supports_modifier (crtc_kms,
+                                 dma_buf->drm_format,
+                                 dma_buf->drm_modifier);
+}
+
 CoglScanout *
 meta_wayland_dma_buf_try_acquire_scanout (MetaWaylandBuffer     *buffer,
                                           CoglOnscreen          *onscreen,
@@ -1348,7 +1384,8 @@ find_scanout_tranche_func (gconstpointer a,
     return -1;
 }
 
-static void
+/* Returns TRUE if the feedback's tranches changed */
+static gboolean
 ensure_scanout_tranche (MetaWaylandDmaBufSurfaceFeedback *surface_feedback,
                         MetaCrtc                         *crtc)
 {
@@ -1365,13 +1402,14 @@ ensure_scanout_tranche (MetaWaylandDmaBufSurfaceFeedback *surface_feedback,
   g_autoptr (GArray) formats = NULL;
   MetaWaylandDmaBufTranchePriority priority;
   MetaWaylandDmaBufTrancheFlags flags;
+  gboolean removed_old = FALSE;
 
-  g_return_if_fail (META_IS_CRTC_KMS (crtc));
+  g_return_val_if_fail (META_IS_CRTC_KMS (crtc), FALSE);
 
   crtc_kms = META_CRTC_KMS (crtc);
   kms_plane = meta_crtc_kms_get_assigned_primary_plane (crtc_kms);
 
-  g_return_if_fail (META_IS_KMS_PLANE (kms_plane));
+  g_return_val_if_fail (META_IS_KMS_PLANE (kms_plane), FALSE);
 
   el = g_list_find_custom (feedback->tranches, NULL, find_scanout_tranche_func);
   if (el)
@@ -1379,10 +1417,11 @@ ensure_scanout_tranche (MetaWaylandDmaBufSurfaceFeedback *surface_feedback,
       tranche = el->data;
 
       if (tranche->scanout_crtc_id == meta_crtc_get_id (crtc))
-        return;
+        return FALSE;
 
       meta_wayland_dma_buf_tranche_free (tranche);
       feedback->tranches = g_list_delete_link (feedback->tranches, el);
+      removed_old = TRUE;
     }
 
   formats = g_array_new (FALSE, FALSE, sizeof (MetaWaylandDmaBufFormat));
@@ -1418,7 +1457,7 @@ ensure_scanout_tranche (MetaWaylandDmaBufSurfaceFeedback *surface_feedback,
         }
 
       if (formats->len == 0)
-        return;
+        return removed_old;
     }
   else
     {
@@ -1439,7 +1478,7 @@ ensure_scanout_tranche (MetaWaylandDmaBufSurfaceFeedback *surface_feedback,
         }
 
       if (formats->len == 0)
-        return;
+        return removed_old;
     }
 
   priority = META_WAYLAND_DMA_BUF_TRANCHE_PRIORITY_HIGH;
@@ -1450,9 +1489,11 @@ ensure_scanout_tranche (MetaWaylandDmaBufSurfaceFeedback *surface_feedback,
                                               flags);
   tranche->scanout_crtc_id = meta_crtc_get_id (crtc);
   meta_wayland_dma_buf_feedback_add_tranche (feedback, tranche);
+  return TRUE;
 }
 
-static void
+/* Returns TRUE if the feedback's tranches changed */
+static gboolean
 clear_scanout_tranche (MetaWaylandDmaBufSurfaceFeedback *surface_feedback)
 {
   MetaWaylandDmaBufFeedback *feedback = surface_feedback->feedback;
@@ -1461,23 +1502,26 @@ clear_scanout_tranche (MetaWaylandDmaBufSurfaceFeedback *surface_feedback)
 
   el = g_list_find_custom (feedback->tranches, NULL, find_scanout_tranche_func);
   if (!el)
-    return;
+    return FALSE;
 
   tranche = el->data;
   meta_wayland_dma_buf_tranche_free (tranche);
   feedback->tranches = g_list_delete_link (feedback->tranches, el);
+  return TRUE;
 }
 
-static void
+/* Returns TRUE if the feedback's tranches changed */
+static gboolean
 update_surface_feedback_tranches (MetaWaylandDmaBufSurfaceFeedback *surface_feedback)
 {
   MetaCrtc *crtc;
 
   crtc = meta_wayland_surface_get_scanout_candidate (surface_feedback->surface);
-  if (crtc)
-    ensure_scanout_tranche (surface_feedback, crtc);
+  if (crtc &&
+      !meta_wayland_surface_is_scanout_tranche_disabled (surface_feedback->surface))
+    return ensure_scanout_tranche (surface_feedback, crtc);
   else
-    clear_scanout_tranche (surface_feedback);
+    return clear_scanout_tranche (surface_feedback);
 }
 
 static void
@@ -1487,7 +1531,12 @@ on_scanout_candidate_changed (MetaWaylandSurface               *surface,
 {
   GList *l;
 
-  update_surface_feedback_tranches (surface_feedback);
+  /* Only re-send when the tranches changed. The scanout candidate can flip on
+   * every buffer detach/attach (e.g. Wine during swapchain recreation), and
+   * some clients (NVIDIA's Vulkan WSI) treat any feedback event as a reason to
+   * mark the swapchain out of date, which then flips the candidate again. */
+  if (!update_surface_feedback_tranches (surface_feedback))
+    return;
 
   for (l = surface_feedback->resources; l; l = l->next)
     {
